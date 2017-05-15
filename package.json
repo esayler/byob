@@ -1,0 +1,8 @@
+{
+  "name": "byob",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:esayler/byob.git",
+  "author": "Eric Sayler <easayler@gmail.com>",
+  "license": "MIT"
+}

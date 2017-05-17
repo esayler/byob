@@ -1,0 +1,82 @@
+[
+    {
+      "category": "hearts",
+      "hearts": 3,
+      "id": 1,
+      "name": "Apple Pie",
+      "notes": "(Tabantha Wheat, Cane Sugar & Goat Butter obtainable in Rito Village)",
+      "value": 0
+    },
+    {
+      "category": "hearts",
+      "hearts": 14,
+      "id": 2,
+      "name": "Meat Pie",
+      "notes": "You can use any raw meat or poultry, but gourmet meat restores the most hearts.",
+      "value": 0
+    },
+    {
+      "category": "hearts",
+      "hearts": 3,
+      "id": 3,
+      "name": "Fruit Pie",
+      "notes": "Swap Wildberry for other fruit (such as Palm Fruit) for different results. Adding another fruit amplifies the healing effect.",
+      "value": 0
+    },
+    {
+      "category": "hearts",
+      "hearts": 0.25,
+      "id": 4,
+      "name": "Monster Cake",
+      "notes": "restores 5 hearts during the Blood Moon",
+      "value": 0
+    },
+    {
+      "category": "hearts",
+      "hearts": 3,
+      "id": 5,
+      "name": "Nutcake",
+      "notes": "The acorn can be swapped for chickaloo tree nuts",
+      "value": 0
+    },
+    {
+      "category": "hearts",
+      "hearts": 5,
+      "id": 6,
+      "name": "Fruit cake",
+      "notes": "Always use two different fruits in this cake. You may switch the apples or wildberries for other fruits to add special effects.",
+      "value": 0
+    },
+    {
+      "category": "hearts",
+      "hearts": 7,
+      "id": 7,
+      "name": "Carrot Cake",
+      "notes": "Use only one type of carrot to add a special effect",
+      "value": 0
+    },
+    {
+      "category": "hearts",
+      "hearts": 3,
+      "id": 8,
+      "name": "Egg Pudding",
+      "notes": "Add extra ingredients to give it special effects or to increase the hearts restored",
+      "value": 0
+    },
+    {
+      "category": "hearts",
+      "hearts": 9,
+      "id": 9,
+      "name": "Egg Tart",
+      "notes": "",
+      "value": 0
+    },
+    {
+      "category": "hearts",
+      "hearts": 3,
+      "id": 10,
+      "name": "Mushroom risotto",
+      "notes": "Use other or more mushrooms to increase hearts restored. Switch the Mushrooms for Hearty Salmon to get a fish lover's dish",
+      "value": 0
+    }
+]

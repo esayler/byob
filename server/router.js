@@ -1,6 +1,10 @@
 const express = require('express')
 const router = express.Router()
 const chalk = require('chalk')
+const util = require('util')
+var _ = require('lodash')
+// const schema = require('./schema.js')
+var Promise = require('bluebird')
 
 const environment = process.env.NODE_ENV || 'development'
 const configuration = require('../knexfile')[environment]
@@ -124,6 +128,7 @@ router.get('/materials/:id/recipes', (req, res) => {
     )
     .catch(error => {
       console.error(chalk.red('error', error))
+      res.sendStatus(500).json(error)
     })
   })
   .then(() => {
@@ -131,18 +136,50 @@ router.get('/materials/:id/recipes', (req, res) => {
   })
   .catch(error => {
     console.error(chalk.red('error getting recipes that feature a specifc material', JSON.stringify(error)))
-    res.sendStatus(500).json(error)
+    res.status(500).json(error)
   })
 })
 
 // add a new material
+// TODO: add validation
 router.post('/materials', (req, res) => {
-
+  knex('materials').insert(req.body, 'id')
+  .then(id => {
+    res.status(200).json(id)
+  })
+  .catch(error => {
+    console.error(chalk.red('error adding a new material', JSON.stringify(error)))
+    res.status(500).json({ error: error.detail })
+  })
 })
 
 // add a new recipe with ingredients (existing materials)
+// TODO: add validation for ingredient IDs
 router.post('/recipes', (req, res) => {
+  let recipe = _.omit(req.body, 'ingredients')
+  let { ingredients } = _.pick(req.body, 'ingredients')
 
+  knex.transaction((trx) => {
+    return trx
+      .insert(recipe, 'id')
+      .into('recipes')
+      .then(ids => {
+        return Promise.map(ingredients, (ingredient) => {
+          let entry = {}
+          entry.recipe_id = ids[0]
+          entry.material_id = ingredient.id
+          entry.quantity = ingredient.quantity
+          return trx.insert(entry).into('ingredients')
+        })
+      })
+  })
+  .then(inserts => {
+    res.status(200).json({ msg: `successfully added new recipe and ${inserts.length} ingredients` })
+  })
+  .catch(error => {
+    console.error(chalk.red('error adding a new recipe', JSON.stringify(error.detail)))
+    res.status(500).json({ error: error.detail })
+  })
 })
 
 // update a particular material

@@ -1,10 +1,11 @@
 const app = require('express')()
 const bodyParser = require('body-parser')
-
+const expressValidator = require('express-validator')
 const router = require('./router')
 
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
+app.use(expressValidator())
 
 if (process.env.NODE_ENV === 'development') {
   const morgan = require('morgan')

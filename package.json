@@ -7,7 +7,8 @@
   "license": "MIT",
   "scripts": {
     "start": "NODE_ENV=development nodemon server/index.js --ignore public/",
-    "test": "mocha"
+    "test": "mocha",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "chai": "^3.5.0",

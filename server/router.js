@@ -12,7 +12,7 @@ const knex = require('knex')(configuration)
 
 // get all materials
 router.get('/materials', (req, res) => {
-  knex('materials').select()
+  knex('materials').select('id', 'name', 'category', 'type', 'effect', 'potency', 'hearts', 'value', 'duration').where('deleted', false)
     .then(materials => {
       res.status(200).json(materials)
     })
@@ -25,7 +25,7 @@ router.get('/materials', (req, res) => {
 // get a specific material
 router.get('/materials/:id', (req, res) => {
   const { id } = req.params
-  knex('materials').select().where('id', id)
+  knex('materials').select('id', 'name', 'category', 'type', 'effect', 'potency', 'hearts', 'value', 'duration').where('id', id).andWhere('deleted', false)
     .then(materials => {
       res.status(200).json(materials)
     })
@@ -39,15 +39,15 @@ router.get('/materials/:id', (req, res) => {
 router.get('/recipes', (req, res) => {
   let data = []
 
-  knex('recipes').select()
+  knex('recipes').select('id', 'name', 'category', 'notes', 'hearts', 'value').where('deleted', false)
   .then(recipes => {
     return Promise.all(
       recipes.map(recipe => {
         return knex('ingredients')
         .select('quantity')
-        .where('recipe_id', recipe.id)
+        .where('recipe_id', recipe.id).andWhere('deleted', false)
         .join('materials', 'ingredients.material_id', '=', 'materials.id')
-        .select('materials.*')
+        .select('id', 'name', 'category', 'type', 'effect', 'potency', 'hearts', 'value', 'duration')
         .tap(recipeIngredients => {
           Object.assign(recipe, { ingredients: recipeIngredients })
           data.push(recipe)
@@ -65,22 +65,26 @@ router.get('/recipes/:id', (req, res) => {
   const { id } = req.params
   let data = {}
 
-  knex('recipes').where('id', id)
+  knex('recipes').select('id', 'name', 'category', 'notes', 'hearts', 'value').where('id', id).andWhere('deleted', false)
   .then(recipe => {
     Object.assign(data, recipe[0])
     return knex('ingredients')
     .select('quantity')
-    .where('recipe_id', id)
+    .where('recipe_id', id).andWhere('ingredients.deleted', false)
     .join('materials', 'ingredients.material_id', '=', 'materials.id')
-    .select('materials.*')
+    .select('id', 'name', 'category', 'type', 'effect', 'potency', 'hearts', 'value', 'duration')
   })
   .then(ingredients => {
     Object.assign(data, { ingredients })
-    res.status(200).json(data)
+    if (data.ingredients.length === 0) {
+      res.status(200).json([])
+    } else {
+      res.status(200).json(data)
+    }
   })
   .catch(error => {
-    console.error(chalk.red('error getting one recipe', JSON.stringify(error)))
-    res.sendStatus(500).json(error)
+    console.error(chalk.red('error getting one recipe', error))
+    res.status(500).json(error)
   })
 })
 
@@ -90,9 +94,9 @@ router.get('/recipes/:id/materials', (req, res) => {
 
   knex('ingredients')
   .select('quantity')
-  .where('recipe_id', id)
+  .where('recipe_id', id).andWhere('ingredients.deleted', false)
   .join('materials', 'ingredients.material_id', '=', 'materials.id')
-  .select('materials.*')
+  .select('id', 'name', 'category', 'type', 'effect', 'potency', 'hearts', 'value', 'duration')
   .then(ingredients => {
     res.status(200).json(ingredients)
   })
@@ -108,18 +112,16 @@ router.get('/materials/:id/recipes', (req, res) => {
   let data = []
 
   knex('ingredients')
-  // .select('quantity')
   .where('material_id', id)
   .join('recipes', 'ingredients.recipe_id', '=', 'recipes.id')
-  .select('recipes.*')
+  .select('id', 'name', 'category', 'notes', 'hearts', 'value').where('recipes.deleted', false)
   .then(recipes => {
-    // res.status(200).json(recipes)
     return Promise.all(
       recipes.map(recipe => {
         return knex('ingredients').select('quantity')
-        .where('recipe_id', recipe.id)
+        .where('recipe_id', recipe.id).andWhere('ingredients.deleted', false)
         .join('materials', 'ingredients.material_id', '=', 'materials.id')
-        .select('materials.*')
+        .select('id', 'name', 'category', 'type', 'effect', 'potency', 'hearts', 'value', 'duration')
         .tap(recipeIngredients => {
           Object.assign(recipe, { ingredients: recipeIngredients })
           data.push(recipe)
@@ -135,7 +137,7 @@ router.get('/materials/:id/recipes', (req, res) => {
     res.status(200).json(data)
   })
   .catch(error => {
-    console.error(chalk.red('error getting recipes that feature a specifc material', JSON.stringify(error)))
+    console.error(chalk.red('error getting recipes that feature a specifc material', error))
     res.status(500).json(error)
   })
 })
@@ -261,14 +263,42 @@ router.patch('/recipes/:id', (req, res) => {
   }
 })
 
-// delete a particular recipe
+// delete a particular material (soft delete)
 router.delete('/materials/:id', (req, res) => {
-
+  const { id } = req.params
+  knex('materials')
+    .where('id', id)
+    .update({ deleted: true }, 'id')
+    .then(ids => {
+      res.status(200).json({ msg: `successfully deleted ${ids.length} material` })
+    })
+    .catch(error => {
+      console.error(
+        chalk.red('error deleting a material', JSON.stringify(error))
+      )
+      res.sendStatus(500).json(error)
+    })
 })
 
-// delete a specific material
-router.delete('/recipes/:id', (req, res) => {
 
+// delete a specific recipe (soft delete)
+router.delete('/recipes/:id', (req, res) => {
+  const { id } = req.params
+  knex.transaction(trx => {
+    return trx('ingredients').where('recipe_id', id).update({ deleted: true })
+    .then(() => {
+      return trx('recipes').where('id', id).update({ deleted: true })
+    })
+  })
+  .then(() => {
+    res.status(200).json({ msg: `successfully deleted recipe` })
+  })
+  .catch(error => {
+    console.error(
+      chalk.red('error deleting a recipe', error)
+    )
+    res.status(500).json(error)
+  })
 })
 
 module.exports = router

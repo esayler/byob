@@ -75,7 +75,7 @@ router.get('/recipes', (req, res) => {
           return knex('ingredients')
             .select('quantity')
             .where('recipe_id', recipe.id)
-            .andWhere('deleted', false)
+            .andWhere('ingredients.deleted', false)
             .join('materials', 'ingredients.material_id', '=', 'materials.id')
             .select(
               'id',

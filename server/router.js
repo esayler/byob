@@ -184,12 +184,81 @@ router.post('/recipes', (req, res) => {
 
 // update a particular material
 router.patch('/materials/:id', (req, res) => {
-
+  const { id } = req.params
+  knex('materials').where('id', id)
+  .update(req.body, 'id')
+  .then(ids => {
+    return knex('materials').where('id', ids[0])
+  })
+  .then(materials => {
+    res.status(200).json(materials)
+  })
+  .catch(error => {
+    console.error(chalk.red('error updating a material', JSON.stringify(error)))
+    res.status(500).json({ error: error.detail })
+  })
 })
 
 // update a specific recipe
 router.patch('/recipes/:id', (req, res) => {
+  const { id } = req.params
+  let recipe = _.omit(req.body, 'ingredients')
+  let { ingredients } = _.pick(req.body, 'ingredients')
+  console.log(recipe)
 
+  if (!_.isEmpty(recipe) && ingredients.length > 0) {
+    knex.transaction(trx => {
+      trx('recipes').where('id', id).update(recipe, 'id').then(ids => {
+        if (ingredients.length > 0) {
+          return Promise.map(ingredients, ingredient => {
+            return trx('ingredients')
+              .where('recipe_id', ids[0])
+              .andWhere('material_id', ingredient.id)
+              .update(_.omit(ingredient, 'id'))
+          })
+        } else {
+          trx.commit()
+        }
+      })
+    })
+    .then(() => {
+      res
+        .status(200)
+        .json({ msg: `successfully updated recipe and/or its ingredients` })
+    })
+    .catch(error => {
+      console.error(
+        chalk.red(
+          'error updating a recipe and/or its ingredients',
+          JSON.stringify(error)
+        )
+      )
+      res.status(500).json({ error: error })
+    })
+  } else if (ingredients.length > 0) {
+    knex.transaction(trx => {
+      return Promise.map(ingredients, ingredient => {
+        return trx('ingredients')
+          .where('recipe_id', id)
+          .andWhere('material_id', ingredient.id)
+          .update(_.omit(ingredient, 'id'))
+      })
+    })
+    .then(() => {
+      res.status(200).json({ msg: `successfully updated recipe ingredients` })
+    })
+    .catch(error => {
+      console.error(
+        chalk.red(
+          'error updating a recipe\'s ingredients',
+          JSON.stringify(error)
+        )
+      )
+      res.status(500).json({ error: error })
+    })
+  } else {
+    res.status(500).json({ error: `invalid body` })
+  }
 })
 
 // delete a particular recipe

@@ -320,7 +320,7 @@ describe('API Routes', () => {
           duration: 50,
         })
         .then(res => {
-          res.should.have.status(200)
+          res.should.have.status(201)
           res.should.be.json
           res.should.have.header('location')
           res.body.should.be.an('object')
@@ -387,7 +387,7 @@ describe('API Routes', () => {
           ],
         })
         .then(res => {
-          res.should.have.status(200)
+          res.should.have.status(201)
           res.should.be.json
           res.should.have.header('location')
           res.body.should.be.an('object')

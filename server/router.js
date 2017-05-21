@@ -253,7 +253,7 @@ router.post('/materials', (req, res) => {
       .andWhere('deleted', false)
     })
     .then((materials) => {
-      res.status(200).json(MaterialSerializer.serialize(materials))
+      res.status(201).json(MaterialSerializer.serialize(materials))
     })
     .catch(error => {
       console.error(
@@ -313,9 +313,9 @@ router.post('/recipes', (req, res) => {
     .then(ingredients => {
       Object.assign(data, { ingredients })
       if (data.ingredients.length === 0) {
-        res.status(200).json(RecipeSerializer.serialize([]))
+        res.status(201).json(RecipeSerializer.serialize(data))
       } else {
-        res.status(200).json(RecipeSerializer.serialize(data))
+        res.status(201).json(RecipeSerializer.serialize(data))
       }
     })
     .catch(error => {

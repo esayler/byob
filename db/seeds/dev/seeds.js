@@ -3,12 +3,12 @@ const materials = require('../../../data/materials.json')
 const ingredients = require('../../../data/ingredients.json')
 
 exports.seed = function (knex, Promise) {
-  return knex('materials').del()
+  return knex('ingredients').del()
     .then(function () {
-      return knex('recipes').del()
+      return knex('materials').del()
     })
     .then(function () {
-      return knex('ingredients').del()
+      return knex('recipes').del()
     })
     .then(function () {
       return knex('materials').insert(materials)

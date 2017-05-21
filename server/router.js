@@ -1,8 +1,9 @@
 const express = require('express')
 const router = express.Router()
 const chalk = require('chalk')
-var _ = require('lodash')
-var Promise = require('bluebird')
+const _ = require('lodash')
+const Promise = require('bluebird')
+const { MaterialSerializer, RecipeSerializer } = require('./serializer')
 
 const environment = process.env.NODE_ENV || 'development'
 const configuration = require('../knexfile')[environment]
@@ -24,7 +25,7 @@ router.get('/materials', (req, res) => {
     )
     .where('deleted', false)
     .then(materials => {
-      res.status(200).json(materials)
+      res.status(200).json(MaterialSerializer.serialize(materials))
     })
     .catch(error => {
       console.error(
@@ -52,7 +53,7 @@ router.get('/materials/:id', (req, res) => {
     .where('id', id)
     .andWhere('deleted', false)
     .then(materials => {
-      res.status(200).json(materials)
+      res.status(200).json(MaterialSerializer.serialize(materials))
     })
     .catch(error => {
       console.error(
@@ -96,7 +97,7 @@ router.get('/recipes', (req, res) => {
       )
     })
     .then(() => {
-      res.status(200).json(data)
+      res.status(200).json(RecipeSerializer.serialize(data))
     })
 })
 
@@ -131,9 +132,9 @@ router.get('/recipes/:id', (req, res) => {
     .then(ingredients => {
       Object.assign(data, { ingredients })
       if (data.ingredients.length === 0) {
-        res.status(200).json([])
+        res.status(200).json(RecipeSerializer.serialize([]))
       } else {
-        res.status(200).json(data)
+        res.status(200).json(RecipeSerializer.serialize(data))
       }
     })
     .catch(error => {
@@ -162,8 +163,8 @@ router.get('/recipes/:id/materials', (req, res) => {
       'value',
       'duration'
     )
-    .then(ingredients => {
-      res.status(200).json(ingredients)
+    .then(materials => {
+      res.status(200).json(MaterialSerializer.serialize(materials))
     })
     .catch(error => {
       console.error(
@@ -216,7 +217,7 @@ router.get('/materials/:id/recipes', (req, res) => {
       })
     })
     .then(() => {
-      res.status(200).json(data)
+      res.status(200).json(RecipeSerializer.serialize(data))
     })
     .catch(error => {
       console.error(
@@ -234,12 +235,29 @@ router.get('/materials/:id/recipes', (req, res) => {
 router.post('/materials', (req, res) => {
   knex('materials')
     .insert(req.body, 'id')
-    .then(id => {
-      res.status(200).json(id)
+    .then(ids => {
+      res.location('/api/v1/materials/' + ids[0])
+      return knex('materials')
+      .select(
+        'id',
+        'name',
+        'category',
+        'type',
+        'effect',
+        'potency',
+        'hearts',
+        'value',
+        'duration'
+      )
+      .where('id', ids[0])
+      .andWhere('deleted', false)
+    })
+    .then((materials) => {
+      res.status(200).json(MaterialSerializer.serialize(materials))
     })
     .catch(error => {
       console.error(
-        chalk.red('error adding a new material', JSON.stringify(error))
+        chalk.red('error adding a new material', error)
       )
       res.status(500).json({ error: error.detail })
     })
@@ -250,10 +268,14 @@ router.post('/materials', (req, res) => {
 router.post('/recipes', (req, res) => {
   let recipe = _.omit(req.body, 'ingredients')
   let { ingredients } = _.pick(req.body, 'ingredients')
+  let recipeId = []
+  let data = {}
 
   knex
     .transaction(trx => {
       return trx.insert(recipe, 'id').into('recipes').then(ids => {
+        recipeId = ids[0]
+        res.location('/api/v1/recipes/' + ids[0])
         return Promise.map(ingredients, ingredient => {
           let entry = {}
           entry.recipe_id = ids[0]
@@ -264,11 +286,37 @@ router.post('/recipes', (req, res) => {
       })
     })
     .then(inserts => {
-      res
-        .status(200)
-        .json({
-          msg: `successfully added new recipe and ${inserts.length} ingredients`,
-        })
+      return knex('recipes')
+        .select('id', 'name', 'category', 'notes', 'hearts', 'value')
+        .where('id', recipeId)
+        .andWhere('deleted', false)
+    })
+    .then(recipe => {
+      Object.assign(data, recipe[0])
+      return knex('ingredients')
+        .select('quantity')
+        .where('recipe_id', recipeId)
+        .andWhere('ingredients.deleted', false)
+        .join('materials', 'ingredients.material_id', '=', 'materials.id')
+        .select(
+          'id',
+          'name',
+          'category',
+          'type',
+          'effect',
+          'potency',
+          'hearts',
+          'value',
+          'duration'
+        )
+    })
+    .then(ingredients => {
+      Object.assign(data, { ingredients })
+      if (data.ingredients.length === 0) {
+        res.status(200).json(RecipeSerializer.serialize([]))
+      } else {
+        res.status(200).json(RecipeSerializer.serialize(data))
+      }
     })
     .catch(error => {
       console.error(
@@ -288,7 +336,7 @@ router.patch('/materials/:id', (req, res) => {
       return knex('materials').where('id', ids[0])
     })
     .then(materials => {
-      res.status(200).json(materials)
+      res.status(200).json(MaterialSerializer.serialize(materials))
     })
     .catch(error => {
       console.error(
@@ -303,7 +351,7 @@ router.patch('/recipes/:id', (req, res) => {
   const { id } = req.params
   let recipe = _.omit(req.body, 'ingredients')
   let { ingredients } = _.pick(req.body, 'ingredients')
-  console.log(recipe)
+  let data = {}
 
   if (!_.isEmpty(recipe) && ingredients.length > 0) {
     knex
@@ -312,7 +360,7 @@ router.patch('/recipes/:id', (req, res) => {
           if (ingredients.length > 0) {
             return Promise.map(ingredients, ingredient => {
               return trx('ingredients')
-                .where('recipe_id', ids[0])
+                .where('recipe_id', id)
                 .andWhere('material_id', ingredient.id)
                 .update(_.omit(ingredient, 'id'))
             })
@@ -321,10 +369,38 @@ router.patch('/recipes/:id', (req, res) => {
           }
         })
       })
-      .then(() => {
-        res
-          .status(200)
-          .json({ msg: `successfully updated recipe and/or its ingredients` })
+      .then(inserts => {
+        return knex('recipes')
+          .select('id', 'name', 'category', 'notes', 'hearts', 'value')
+          .where('id', id)
+          .andWhere('deleted', false)
+      })
+      .then(recipe => {
+        Object.assign(data, recipe[0])
+        return knex('ingredients')
+          .select('quantity')
+          .where('recipe_id', id)
+          .andWhere('ingredients.deleted', false)
+          .join('materials', 'ingredients.material_id', '=', 'materials.id')
+          .select(
+            'id',
+            'name',
+            'category',
+            'type',
+            'effect',
+            'potency',
+            'hearts',
+            'value',
+            'duration'
+          )
+      })
+      .then(ingredients => {
+        Object.assign(data, { ingredients })
+        if (data.ingredients.length === 0) {
+          res.status(200).json(RecipeSerializer.serialize([]))
+        } else {
+          res.status(200).json(RecipeSerializer.serialize(data))
+        }
       })
       .catch(error => {
         console.error(
@@ -345,8 +421,38 @@ router.patch('/recipes/:id', (req, res) => {
             .update(_.omit(ingredient, 'id'))
         })
       })
-      .then(() => {
-        res.status(200).json({ msg: `successfully updated recipe ingredients` })
+      .then(inserts => {
+        return knex('recipes')
+          .select('id', 'name', 'category', 'notes', 'hearts', 'value')
+          .where('id', id)
+          .andWhere('deleted', false)
+      })
+      .then(recipe => {
+        Object.assign(data, recipe[0])
+        return knex('ingredients')
+          .select('quantity')
+          .where('recipe_id', id)
+          .andWhere('ingredients.deleted', false)
+          .join('materials', 'ingredients.material_id', '=', 'materials.id')
+          .select(
+            'id',
+            'name',
+            'category',
+            'type',
+            'effect',
+            'potency',
+            'hearts',
+            'value',
+            'duration'
+          )
+      })
+      .then(ingredients => {
+        Object.assign(data, { ingredients })
+        if (data.ingredients.length === 0) {
+          res.status(200).json(RecipeSerializer.serialize([]))
+        } else {
+          res.status(200).json(RecipeSerializer.serialize(data))
+        }
       })
       .catch(error => {
         console.error(
@@ -362,6 +468,7 @@ router.patch('/recipes/:id', (req, res) => {
   }
 })
 
+
 // delete a particular material (soft delete)
 router.delete('/materials/:id', (req, res) => {
   const { id } = req.params
@@ -369,15 +476,13 @@ router.delete('/materials/:id', (req, res) => {
     .where('id', id)
     .update({ deleted: true }, 'id')
     .then(ids => {
-      res
-        .status(200)
-        .json({ msg: `successfully deleted ${ids.length} material` })
+      res.sendStatus(204)
     })
     .catch(error => {
       console.error(
         chalk.red('error deleting a material', JSON.stringify(error))
       )
-      res.sendStatus(500).json(error)
+      res.status(500).json(error)
     })
 })
 
@@ -394,12 +499,13 @@ router.delete('/recipes/:id', (req, res) => {
         })
     })
     .then(() => {
-      res.status(200).json({ msg: `successfully deleted recipe` })
+      res.sendStatus(204)
     })
     .catch(error => {
       console.error(chalk.red('error deleting a recipe', error))
       res.status(500).json(error)
     })
 })
+
 
 module.exports = router

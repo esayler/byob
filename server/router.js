@@ -53,7 +53,11 @@ router.get('/materials/:id', (req, res) => {
     .where('id', id)
     .andWhere('deleted', false)
     .then(materials => {
-      res.status(200).json(MaterialSerializer.serialize(materials))
+      if (materials.length === 0) {
+        res.sendStatus(404)
+      } else {
+        res.status(200).json(MaterialSerializer.serialize(materials))
+      }
     })
     .catch(error => {
       console.error(
@@ -130,9 +134,11 @@ router.get('/recipes/:id', (req, res) => {
         )
     })
     .then(ingredients => {
-      Object.assign(data, { ingredients })
-      if (data.ingredients.length === 0) {
-        res.status(200).json(RecipeSerializer.serialize([]))
+      if (ingredients.length > 0) {
+        Object.assign(data, { ingredients })
+      }
+      if (_.isEmpty(data)) {
+        res.sendStatus(404)
       } else {
         res.status(200).json(RecipeSerializer.serialize(data))
       }
@@ -164,7 +170,11 @@ router.get('/recipes/:id/materials', (req, res) => {
       'duration'
     )
     .then(materials => {
-      res.status(200).json(MaterialSerializer.serialize(materials))
+      if (materials.length > 0) {
+        res.status(200).json(MaterialSerializer.serialize(materials))
+      } else {
+        res.sendStatus(404)
+      }
     })
     .catch(error => {
       console.error(
@@ -217,7 +227,11 @@ router.get('/materials/:id/recipes', (req, res) => {
       })
     })
     .then(() => {
-      res.status(200).json(RecipeSerializer.serialize(data))
+      if (data.length > 0) {
+        res.status(200).json(RecipeSerializer.serialize(data))
+      } else {
+        res.sendStatus(404)
+      }
     })
     .catch(error => {
       console.error(
@@ -256,9 +270,6 @@ router.post('/materials', (req, res) => {
       res.status(201).json(MaterialSerializer.serialize(materials))
     })
     .catch(error => {
-      console.error(
-        chalk.red('error adding a new material', error)
-      )
       res.status(500).json({ error: error.detail })
     })
 })
@@ -319,9 +330,6 @@ router.post('/recipes', (req, res) => {
       }
     })
     .catch(error => {
-      console.error(
-        chalk.red('error adding a new recipe', JSON.stringify(error.detail))
-      )
       res.status(500).json({ error: error.detail })
     })
 })
@@ -331,16 +339,24 @@ router.patch('/materials/:id', (req, res) => {
   const { id } = req.params
   knex('materials')
     .where('id', id)
-    .update(req.body, 'id')
+    .update(_.omit(req.body, 'id'), 'id')
     .then(ids => {
-      return knex('materials').where('id', ids[0])
+      if (ids[0]) {
+        return knex('materials').where('id', ids[0])
+      } else {
+        return Promise.resolve([])
+      }
     })
     .then(materials => {
-      res.status(200).json(MaterialSerializer.serialize(materials))
+      if (materials.length > 0) {
+        res.status(200).json(MaterialSerializer.serialize(materials))
+      } else {
+        res.sendStatus(404)
+      }
     })
     .catch(error => {
       console.error(
-        chalk.red('error updating a material', JSON.stringify(error))
+        chalk.red('error updating a material', error)
       )
       res.status(500).json({ error: error.detail })
     })
@@ -349,11 +365,25 @@ router.patch('/materials/:id', (req, res) => {
 // update a specific recipe
 router.patch('/recipes/:id', (req, res) => {
   const { id } = req.params
-  let recipe = _.omit(req.body, 'ingredients')
+  let recipe = _.omit(req.body, ['ingredients', 'id'])
   let { ingredients } = _.pick(req.body, 'ingredients')
   let data = {}
+  let done = false
 
-  if (!_.isEmpty(recipe) && ingredients.length > 0) {
+  knex('recipes').where('id', id)
+  .then(recipes => {
+    if (recipes.length === 0) {
+      done = true
+    }
+  })
+
+  if (done) {
+    res.status(404).end()
+    return
+  }
+
+
+  if (!_.isEmpty(recipe) && ingredients && ingredients.length > 0) {
     knex
       .transaction(trx => {
         trx('recipes').where('id', id).update(recipe, 'id').then(ids => {
@@ -411,7 +441,7 @@ router.patch('/recipes/:id', (req, res) => {
         )
         res.status(500).json({ error: error })
       })
-  } else if (ingredients.length > 0) {
+  } else if (ingredients && ingredients.length > 0) {
     knex
       .transaction(trx => {
         return Promise.map(ingredients, ingredient => {
@@ -463,8 +493,45 @@ router.patch('/recipes/:id', (req, res) => {
         )
         res.status(500).json({ error: error })
       })
+  } else if (!_.isEmpty(recipe)) {
+    knex('recipes')
+      .where('id', id)
+      .update(recipe, 'id')
+      .then(ids => {
+        return knex('recipes')
+          .select('id', 'name', 'category', 'notes', 'hearts', 'value')
+          .where('id', id)
+          .andWhere('deleted', false)
+      })
+      .then(recipe => {
+        Object.assign(data, recipe[0])
+        return knex('ingredients')
+          .select('quantity')
+          .where('recipe_id', id)
+          .andWhere('ingredients.deleted', false)
+          .join('materials', 'ingredients.material_id', '=', 'materials.id')
+          .select(
+            'id',
+            'name',
+            'category',
+            'type',
+            'effect',
+            'potency',
+            'hearts',
+            'value',
+            'duration'
+          )
+      })
+      .then(ingredients => {
+        Object.assign(data, { ingredients })
+        if (data.ingredients.length === 0) {
+          res.status(200).json(RecipeSerializer.serialize([]))
+        } else {
+          res.status(200).json(RecipeSerializer.serialize(data))
+        }
+      })
   } else {
-    res.status(500).json({ error: `invalid body` })
+    res.status(500)
   }
 })
 
@@ -476,7 +543,11 @@ router.delete('/materials/:id', (req, res) => {
     .where('id', id)
     .update({ deleted: true }, 'id')
     .then(ids => {
-      res.sendStatus(204)
+      if (ids.length > 0) {
+        res.sendStatus(204)
+      } else {
+        res.sendStatus(404)
+      }
     })
     .catch(error => {
       console.error(
@@ -493,13 +564,17 @@ router.delete('/recipes/:id', (req, res) => {
     .transaction(trx => {
       return trx('ingredients')
         .where('recipe_id', id)
-        .update({ deleted: true })
-        .then(() => {
-          return trx('recipes').where('id', id).update({ deleted: true })
+        .update({ deleted: true }, 'material_id')
+        .then((ids) => {
+          return trx('recipes').where('id', id).update({ deleted: true }, 'id')
         })
     })
-    .then(() => {
-      res.sendStatus(204)
+    .then((ids) => {
+      if (ids.length > 0) {
+        res.sendStatus(204)
+      } else {
+        res.sendStatus(404)
+      }
     })
     .catch(error => {
       console.error(chalk.red('error deleting a recipe', error))

@@ -155,6 +155,18 @@ describe('API Routes', () => {
           throw err
         })
     })
+
+    it('should return 404 if the the material doesn\'t exist', () => {
+      return chai
+        .request(app)
+        .get('/api/v1/materials/999')
+        .then(res => {
+          res.should.have.status(404)
+        })
+        .catch(({ response }) => {
+          response.should.have.status(404)
+        })
+    })
   })
 
   // get a specific recipe
@@ -208,6 +220,18 @@ describe('API Routes', () => {
           throw err
         })
     })
+
+    it('should return 404 if the the recipe doesn\'t exist', () => {
+      return chai
+        .request(app)
+        .get('/api/v1/recipes/999')
+        .then(res => {
+          res.should.have.status(404)
+        })
+        .catch(({ response }) => {
+          response.should.have.status(404)
+        })
+    })
   })
 
   // get all of the materials for a specific recipe
@@ -245,6 +269,18 @@ describe('API Routes', () => {
         })
         .catch(err => {
           throw err
+        })
+    })
+
+    it('should return 404 if the the recipe doesn\'t exist', () => {
+      return chai
+        .request(app)
+        .get('/api/v1/recipes/999/materials')
+        .then(res => {
+          res.should.have.status(404)
+        })
+        .catch(({ response }) => {
+          response.should.have.status(404)
         })
     })
   })
@@ -300,6 +336,18 @@ describe('API Routes', () => {
           throw err
         })
     })
+
+    it('should return 404 if the the material doesn\'t exist', () => {
+      return chai
+        .request(app)
+        .get('/api/v1/materials/999/recipes')
+        .then(res => {
+          res.should.have.status(404)
+        })
+        .catch(({ response }) => {
+          response.should.have.status(404)
+        })
+    })
   })
 
   // add a new material
@@ -350,6 +398,30 @@ describe('API Routes', () => {
         })
         .catch(err => {
           throw err
+        })
+    })
+
+    it('it should respond with an error if body contains duplicate id', () => {
+      return chai
+        .request(app)
+        .post('/api/v1/materials')
+        .send({
+          id: 1,
+          name: 'ZZZZZZZZZ',
+          category: 'food',
+          type: 'Seasoning',
+          effect: '-',
+          potency: '-',
+          hearts: 2,
+          value: 2,
+          duration: 50,
+        })
+        .then(res => {
+          res.should.have.status(500)
+        })
+        .catch(({ response }) => {
+          response.should.be.json
+          response.should.have.status(500)
         })
     })
   })
@@ -432,6 +504,109 @@ describe('API Routes', () => {
           throw err
         })
     })
+
+    it('it should respond with an error if body contains duplicate id', () => {
+      return chai
+        .request(app)
+        .post('/api/v1/recipes')
+        .send({
+          id: 1,
+          name: 'Apple Pie 2',
+          category: 'hearts',
+          notes: '',
+          hearts: 3,
+          value: 0,
+          ingredients: [
+            {
+              quantity: 1,
+              id: 1,
+            },
+            {
+              quantity: 1,
+              id: 11,
+            },
+            {
+              quantity: 1,
+              id: 24,
+            },
+            {
+              quantity: 1,
+              id: 68,
+            },
+          ],
+        })
+        .then(res => {
+          res.should.have.status(500)
+        })
+        .catch(({ response }) => {
+          response.should.be.json
+          response.should.have.status(500)
+        })
+    })
+  })
+
+  // update a specific material
+  describe('PATCH /api/v1/materials/:id', () => {
+    it('should update a specifc material', () => {
+      return chai
+        .request(app)
+        .patch('/api/v1/materials/1')
+        .send({
+          name: 'ZZZZZZZZZ',
+          hearts: 2,
+        })
+        .then(res => {
+          res.should.have.status(200)
+          res.should.be.json
+          res.should.not.have.header('location')
+          res.body.should.be.an('object')
+          res.body.data.should.be.an('array')
+          res.body.data.length.should.equal(1)
+          res.body.data[0].should.have.property('id')
+            .that.is.a('string')
+          res.body.data[0].should.have.property('type')
+            .that.is.a('string')
+            .that.equals('materials')
+          res.body.data[0].attributes.should.not.have.property('quantity')
+            .that.is.a('number')
+          res.body.data[0].attributes.should.not.have.property('id')
+            .that.is.a('number')
+          res.body.data[0].attributes.should.have.property('name')
+            .that.is.a('string')
+            .that.equals('ZZZZZZZZZ')
+          res.body.data[0].attributes.should.have.property('category')
+            .that.is.a('string')
+          res.body.data[0].attributes.should.have.property('type')
+          res.body.data[0].attributes.should.have.property('effect')
+          res.body.data[0].attributes.should.have.property('potency')
+          res.body.data[0].attributes.should.have.property('hearts')
+            .that.is.a('number')
+            .that.equals(2)
+          res.body.data[0].attributes.should.have.property('value')
+          res.body.data[0].attributes.should.have.property('duration')
+          res.body.data[0].attributes.should.not.have.property('created_at')
+          res.body.data[0].attributes.should.not.have.property('updated_at')
+        })
+        .catch(err => {
+          throw err
+        })
+    })
+
+    it('should return 404 if the material doesn\'t exist', () => {
+      return chai
+        .request(app)
+        .patch('/api/v1/materials/999')
+        .send({
+          name: 'ZZZZZZZZZ',
+          hearts: 2,
+        })
+        .then(res => {
+          res.should.have.status(404)
+        })
+        .catch(({ response }) => {
+          response.should.have.status(404)
+        })
+    })
   })
 
   // update a specific recipe
@@ -508,53 +683,20 @@ describe('API Routes', () => {
           throw err
         })
     })
-  })
 
-
-  // update a specific material
-  describe('PATCH /api/v1/materials/:id', () => {
-    it('should update a specifc material', () => {
+    it('should return 404 if the recipe doesn\'t exist', () => {
       return chai
         .request(app)
-        .patch('/api/v1/materials/1')
+        .patch('/api/v1/recipes/999')
         .send({
           name: 'ZZZZZZZZZ',
           hearts: 2,
         })
         .then(res => {
           res.should.have.status(200)
-          res.should.be.json
-          res.should.not.have.header('location')
-          res.body.should.be.an('object')
-          res.body.data.should.be.an('array')
-          res.body.data.length.should.equal(1)
-          res.body.data[0].should.have.property('id')
-            .that.is.a('string')
-          res.body.data[0].should.have.property('type')
-            .that.is.a('string')
-            .that.equals('materials')
-          res.body.data[0].attributes.should.not.have.property('quantity')
-            .that.is.a('number')
-          res.body.data[0].attributes.should.not.have.property('id')
-            .that.is.a('number')
-          res.body.data[0].attributes.should.have.property('name')
-            .that.is.a('string')
-            .that.equals('ZZZZZZZZZ')
-          res.body.data[0].attributes.should.have.property('category')
-            .that.is.a('string')
-          res.body.data[0].attributes.should.have.property('type')
-          res.body.data[0].attributes.should.have.property('effect')
-          res.body.data[0].attributes.should.have.property('potency')
-          res.body.data[0].attributes.should.have.property('hearts')
-            .that.is.a('number')
-            .that.equals(2)
-          res.body.data[0].attributes.should.have.property('value')
-          res.body.data[0].attributes.should.have.property('duration')
-          res.body.data[0].attributes.should.not.have.property('created_at')
-          res.body.data[0].attributes.should.not.have.property('updated_at')
         })
-        .catch(err => {
-          throw err
+        .catch(({ response }) => {
+          response.should.have.status(404)
         })
     })
   })
@@ -572,6 +714,18 @@ describe('API Routes', () => {
           throw err
         })
     })
+
+    it('should send status 404 if material doesn\'t exist', () => {
+      return chai
+        .request(app)
+        .del('/api/v1/materials/999')
+        .then(res => {
+          res.should.have.status(404)
+        })
+        .catch(({ response }) => {
+          response.should.have.status(404)
+        })
+    })
   })
 
   // delete a recipe
@@ -579,12 +733,24 @@ describe('API Routes', () => {
     it('should send status 204 on successful delete', () => {
       return chai
         .request(app)
-        .del('/api/v1/recipes/1')
+        .del('/api/v1/recipes/2')
         .then(res => {
           res.should.have.status(204)
         })
         .catch(err => {
           throw err
+        })
+    })
+
+    it('should send status 404 if material doesn\'t exist', () => {
+      return chai
+        .request(app)
+        .del('/api/v1/recipes/999')
+        .then(res => {
+          res.should.have.status(404)
+        })
+        .catch(({ response }) => {
+          response.should.have.status(404)
         })
     })
   })

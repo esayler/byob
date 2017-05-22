@@ -21,6 +21,10 @@ describe('Server', () => {
 })
 
 describe('API Routes', () => {
+  before(() => {
+    return knex.migrate.latest()
+  })
+
   beforeEach(() => {
     return knex.seed.run()
   })

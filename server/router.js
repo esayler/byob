@@ -382,7 +382,6 @@ router.patch('/recipes/:id', (req, res) => {
     return
   }
 
-
   if (!_.isEmpty(recipe) && ingredients && ingredients.length > 0) {
     knex
       .transaction(trx => {
@@ -535,7 +534,6 @@ router.patch('/recipes/:id', (req, res) => {
   }
 })
 
-
 // delete a particular material (soft delete)
 router.delete('/materials/:id', (req, res) => {
   const { id } = req.params
@@ -581,6 +579,5 @@ router.delete('/recipes/:id', (req, res) => {
       res.status(500).json(error)
     })
 })
-
 
 module.exports = router

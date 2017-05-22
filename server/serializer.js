@@ -1,6 +1,6 @@
 const JSONAPISerializer = require('jsonapi-serializer').Serializer
 
-var MaterialSerializer = new JSONAPISerializer('materials', {
+const MaterialSerializer = new JSONAPISerializer('materials', {
   topLevelLinks: {
     self: '/api/v1/materials',
   },
@@ -16,8 +16,7 @@ var MaterialSerializer = new JSONAPISerializer('materials', {
   ],
 })
 
-
-var RecipeSerializer = new JSONAPISerializer('recipes', {
+const RecipeSerializer = new JSONAPISerializer('recipes', {
   topLevelLinks: {
     self: '/api/v1/recipes',
   },
@@ -37,6 +36,5 @@ var RecipeSerializer = new JSONAPISerializer('recipes', {
     ],
   },
 })
-
 
 module.exports = { MaterialSerializer, RecipeSerializer }

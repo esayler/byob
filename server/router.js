@@ -23,7 +23,26 @@ router.get('/materials', (req, res) => {
       'value',
       'duration'
     )
-    .where('deleted', false)
+    .modify(qb => {
+      if (!_.isEmpty(req.query)) {
+        // only filters based on the first query
+        const key = _.keys(req.query)[0]
+        let value = req.query[key]
+        if (_.includes(['id', 'value', 'duration'], key)) {
+          value = parseInt(value, 10)
+          qb.where(`materials.${key}`, value)
+        } else if (key === 'hearts') {
+          value = parseFloat(value)
+          qb.where(`materials.${key}`, value)
+        } else {
+          value = value.toLowerCase()
+          qb.whereRaw(`lower(${key}) = ?`, value)
+            .andWhere('deleted', false)
+        }
+      } else {
+        qb.where('deleted', false)
+      }
+    })
     .then(materials => {
       res.status(200).json(MaterialSerializer.serialize(materials))
     })

@@ -21,8 +21,22 @@ describe('Server', () => {
 })
 
 describe('API Routes', () => {
+  let token
   before(() => {
-    return knex.migrate.latest()
+    return chai
+      .request(app)
+      .post('/api/v1/auth')
+      .send({
+        username: process.env.USERNAME,
+        password: process.env.PASSWORD,
+      })
+      .then(res => {
+        token = res.body.token
+        return Promise.resolve()
+      })
+      .then(() => {
+        return knex.migrate.latest()
+      })
   })
 
   beforeEach(() => {
@@ -360,6 +374,7 @@ describe('API Routes', () => {
       return chai
         .request(app)
         .post('/api/v1/materials')
+        .set('Authorization', token)
         .send({
           id: 100000,
           name: 'ZZZZZZZZZ',
@@ -409,6 +424,7 @@ describe('API Routes', () => {
       return chai
         .request(app)
         .post('/api/v1/materials')
+        .set('Authorization', token)
         .send({
           id: 1,
           name: 'ZZZZZZZZZ',
@@ -436,6 +452,7 @@ describe('API Routes', () => {
       return chai
         .request(app)
         .post('/api/v1/recipes')
+        .set('Authorization', token)
         .send({
           id: 100002,
           name: 'Apple Pie 3',
@@ -513,6 +530,7 @@ describe('API Routes', () => {
       return chai
         .request(app)
         .post('/api/v1/recipes')
+        .set('Authorization', token)
         .send({
           id: 1,
           name: 'Apple Pie 2',
@@ -555,6 +573,7 @@ describe('API Routes', () => {
       return chai
         .request(app)
         .patch('/api/v1/materials/1')
+        .set('Authorization', token)
         .send({
           name: 'ZZZZZZZZZ',
           hearts: 2,
@@ -600,6 +619,7 @@ describe('API Routes', () => {
       return chai
         .request(app)
         .patch('/api/v1/materials/999')
+        .set('Authorization', token)
         .send({
           name: 'ZZZZZZZZZ',
           hearts: 2,
@@ -619,6 +639,7 @@ describe('API Routes', () => {
       return chai
         .request(app)
         .patch('/api/v1/recipes/1')
+        .set('Authorization', token)
         .send({
           ingredients: [
             {
@@ -692,6 +713,7 @@ describe('API Routes', () => {
       return chai
         .request(app)
         .patch('/api/v1/recipes/999')
+        .set('Authorization', token)
         .send({
           name: 'ZZZZZZZZZ',
           hearts: 2,
@@ -711,6 +733,7 @@ describe('API Routes', () => {
       return chai
         .request(app)
         .del('/api/v1/materials/1')
+        .set('Authorization', token)
         .then(res => {
           res.should.have.status(204)
         })
@@ -723,6 +746,7 @@ describe('API Routes', () => {
       return chai
         .request(app)
         .del('/api/v1/materials/999')
+        .set('Authorization', token)
         .then(res => {
           res.should.have.status(404)
         })
@@ -738,6 +762,7 @@ describe('API Routes', () => {
       return chai
         .request(app)
         .del('/api/v1/recipes/2')
+        .set('Authorization', token)
         .then(res => {
           res.should.have.status(204)
         })
@@ -750,6 +775,7 @@ describe('API Routes', () => {
       return chai
         .request(app)
         .del('/api/v1/recipes/999')
+        .set('Authorization', token)
         .then(res => {
           res.should.have.status(404)
         })

@@ -3,11 +3,39 @@ const router = express.Router()
 const chalk = require('chalk')
 const _ = require('lodash')
 const Promise = require('bluebird')
+const jwt = require('jsonwebtoken')
+
 const { MaterialSerializer, RecipeSerializer } = require('./serializer')
 
 const environment = process.env.NODE_ENV || 'development'
 const configuration = require('../knexfile')[environment]
 const knex = require('knex')(configuration)
+
+const checkAuth = (req, res, next) => {
+  // Check headers/POST body/URL params for an authorization token
+  const token = req.body.token ||
+                req.query.token ||
+                req.headers['authorization']
+
+  if (token) {
+    jwt.verify(token, process.env.CLIENT_SECRET, (err, decoded) => {
+      if (err) {
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid authorization token',
+        })
+      } else {
+        req.decoded = decoded
+        next()
+      }
+    })
+  } else {
+    return res.status(403).json({
+      success: false,
+      message: 'You must be authorized to hit this endpoint',
+    })
+  }
+}
 
 // get all materials
 router.get('/materials', (req, res) => {
@@ -36,8 +64,7 @@ router.get('/materials', (req, res) => {
           qb.where(`materials.${key}`, value)
         } else {
           value = value.toLowerCase()
-          qb.whereRaw(`lower(${key}) = ?`, value)
-            .andWhere('deleted', false)
+          qb.whereRaw(`lower(${key}) = ?`, value).andWhere('deleted', false)
         }
       } else {
         qb.where('deleted', false)
@@ -265,27 +292,27 @@ router.get('/materials/:id/recipes', (req, res) => {
 
 // add a new material
 // TODO: add validation
-router.post('/materials', (req, res) => {
+router.post('/materials', checkAuth, (req, res) => {
   knex('materials')
     .insert(req.body, 'id')
     .then(ids => {
       res.location('/api/v1/materials/' + ids[0])
       return knex('materials')
-      .select(
-        'id',
-        'name',
-        'category',
-        'type',
-        'effect',
-        'potency',
-        'hearts',
-        'value',
-        'duration'
-      )
-      .where('id', ids[0])
-      .andWhere('deleted', false)
+        .select(
+          'id',
+          'name',
+          'category',
+          'type',
+          'effect',
+          'potency',
+          'hearts',
+          'value',
+          'duration'
+        )
+        .where('id', ids[0])
+        .andWhere('deleted', false)
     })
-    .then((materials) => {
+    .then(materials => {
       res.status(201).json(MaterialSerializer.serialize(materials))
     })
     .catch(error => {
@@ -295,7 +322,7 @@ router.post('/materials', (req, res) => {
 
 // add a new recipe with ingredients (existing materials)
 // TODO: add validation for ingredient IDs
-router.post('/recipes', (req, res) => {
+router.post('/recipes', checkAuth, (req, res) => {
   let recipe = _.omit(req.body, 'ingredients')
   let { ingredients } = _.pick(req.body, 'ingredients')
   let recipeId = []
@@ -354,7 +381,7 @@ router.post('/recipes', (req, res) => {
 })
 
 // update a particular material
-router.patch('/materials/:id', (req, res) => {
+router.patch('/materials/:id', checkAuth, (req, res) => {
   const { id } = req.params
   knex('materials')
     .where('id', id)
@@ -374,23 +401,20 @@ router.patch('/materials/:id', (req, res) => {
       }
     })
     .catch(error => {
-      console.error(
-        chalk.red('error updating a material', error)
-      )
+      console.error(chalk.red('error updating a material', error))
       res.status(500).json({ error: error.detail })
     })
 })
 
 // update a specific recipe
-router.patch('/recipes/:id', (req, res) => {
+router.patch('/recipes/:id', checkAuth, (req, res) => {
   const { id } = req.params
   let recipe = _.omit(req.body, ['ingredients', 'id'])
   let { ingredients } = _.pick(req.body, 'ingredients')
   let data = {}
   let done = false
 
-  knex('recipes').where('id', id)
-  .then(recipes => {
+  knex('recipes').where('id', id).then(recipes => {
     if (recipes.length === 0) {
       done = true
     }
@@ -554,7 +578,7 @@ router.patch('/recipes/:id', (req, res) => {
 })
 
 // delete a particular material (soft delete)
-router.delete('/materials/:id', (req, res) => {
+router.delete('/materials/:id', checkAuth, (req, res) => {
   const { id } = req.params
   knex('materials')
     .where('id', id)
@@ -575,18 +599,18 @@ router.delete('/materials/:id', (req, res) => {
 })
 
 // delete a specific recipe (soft delete)
-router.delete('/recipes/:id', (req, res) => {
+router.delete('/recipes/:id', checkAuth, (req, res) => {
   const { id } = req.params
   knex
     .transaction(trx => {
       return trx('ingredients')
         .where('recipe_id', id)
         .update({ deleted: true }, 'material_id')
-        .then((ids) => {
+        .then(ids => {
           return trx('recipes').where('id', id).update({ deleted: true }, 'id')
         })
     })
-    .then((ids) => {
+    .then(ids => {
       if (ids.length > 0) {
         res.sendStatus(204)
       } else {
@@ -598,5 +622,31 @@ router.delete('/recipes/:id', (req, res) => {
       res.status(500).json(error)
     })
 })
+
+router.post('/auth', (req, res) => {
+  const user = req.body
+
+  // If the user enters credentials that don't match our hard-coded
+  // credentials in our .env configuration file, send a JSON error
+  if (user.username !== process.env.USERNAME || user.password !== process.env.PASSWORD) {
+    res.status(403).send({
+      success: false,
+      message: 'Invalid Credentials',
+    })
+  } else {
+    // If the credentials are accurate, create a token and send it back
+    let token = jwt.sign(user, process.env.CLIENT_SECRET, {
+      expiresIn: 172800, // expires in 48 hours
+    })
+
+    res.json({
+      success: true,
+      username: user.username,
+      token: token,
+    })
+  }
+})
+
+
 
 module.exports = router
